@@ -11,33 +11,134 @@
         h1 { margin: 0 0 1.5rem; color: #2d3748; font-size: 1.5rem; }
         label { display: block; margin-bottom: 0.25rem; color: #4a5568; font-size: 0.9rem; }
         input, .result { margin-bottom: 1.25rem; }
-        input[type="number"] { width: 100%; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 1rem; }
+        input[type="number"], input[type="email"], input[type="password"] { width: 100%; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 1rem; }
         input[type="range"] { width: 100%; height: 8px; accent-color: #4299e1; }
         .tip-value { font-weight: bold; color: #2b6cb0; }
         button { width: 100%; padding: 0.75rem; background: #4299e1; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; }
         button:hover { background: #3182ce; }
         .result { background: #edf2f7; padding: 1rem; border-radius: 8px; font-size: 1.1rem; }
         .result span { font-weight: bold; color: #2d3748; }
+        .hidden { display: none !important; }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .tabs button { flex: 1; padding: 0.5rem; background: #e2e8f0; color: #4a5568; }
+        .tabs button.active { background: #4299e1; color: white; }
+        .link { text-align: center; margin-top: 1rem; font-size: 0.9rem; color: #4a5568; }
+        .link a { color: #4299e1; cursor: pointer; text-decoration: none; }
+        .link a:hover { text-decoration: underline; }
+        .logout { margin-top: 1rem; background: #e53e3e !important; }
+        .logout:hover { background: #c53030 !important; }
+        .msg { padding: 0.5rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.9rem; }
+        .msg.error { background: #fed7d7; color: #c53030; }
+        .msg.success { background: #c6f6d5; color: #276749; }
     </style>
 </head>
 <body>
-    <div class="card">
+    <!-- Auth screens: Login / Signup -->
+    <div id="authScreen" class="card">
+        <h1>Welcome</h1>
+        <div class="tabs">
+            <button id="tabLogin" class="active" onclick="showLogin()">Login</button>
+            <button id="tabSignup" onclick="showSignup()">Signup</button>
+        </div>
+        <div id="msg" class="msg hidden"></div>
+        <div id="loginForm">
+            <label for="loginEmail">Email</label>
+            <input type="email" id="loginEmail" placeholder="you@example.com">
+            <label for="loginPass">Password</label>
+            <input type="password" id="loginPass" placeholder="••••••••">
+            <button onclick="login()">Login</button>
+        </div>
+        <div id="signupForm" class="hidden">
+            <label for="signupEmail">Email</label>
+            <input type="email" id="signupEmail" placeholder="you@example.com">
+            <label for="signupPass">Password</label>
+            <input type="password" id="signupPass" placeholder="••••••••">
+            <label for="signupConfirm">Confirm Password</label>
+            <input type="password" id="signupConfirm" placeholder="••••••••">
+            <button onclick="signup()">Sign Up</button>
+        </div>
+    </div>
+
+    <!-- Tip Calculator (shown after login) -->
+    <div id="calcScreen" class="card hidden">
         <h1>Tip Calculator</h1>
-        <!-- Bill amount input -->
         <label for="bill">Bill Amount ($)</label>
         <input type="number" id="bill" placeholder="e.g. 50.00" min="0" step="0.01">
-        <!-- Tip percentage: number input synced with slider -->
         <label for="tip">Tip Percentage: <span class="tip-value" id="tipLabel">15</span>%</label>
         <input type="range" id="tip" min="0" max="50" value="15" oninput="document.getElementById('tipLabel').textContent=this.value">
         <button onclick="calculate()">Calculate</button>
-        <!-- Output area -->
         <div class="result">
             <p>Tip Amount: $<span id="tipOut">0.00</span></p>
             <p>Total Amount: $<span id="totalOut">0.00</span></p>
         </div>
+        <button class="logout" onclick="logout()">Logout</button>
     </div>
+
     <script>
-        // Read bill and tip inputs, compute tip and total, then display
+        const USERS_KEY = 'tipcalc_users';
+
+        function getUsers() { return JSON.parse(localStorage.getItem(USERS_KEY) || '[]'); }
+        function saveUsers(users) { localStorage.setItem(USERS_KEY, JSON.stringify(users)); }
+        function hash(pw) { return btoa(pw); }  // Demo only - NOT secure for production!
+
+        function showMsg(text, type) {
+            const el = document.getElementById('msg');
+            el.textContent = text;
+            el.className = 'msg ' + type;
+            el.classList.remove('hidden');
+        }
+
+        function showLogin() {
+            document.getElementById('tabLogin').classList.add('active');
+            document.getElementById('tabSignup').classList.remove('active');
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('signupForm').classList.add('hidden');
+            document.getElementById('msg').classList.add('hidden');
+        }
+
+        function showSignup() {
+            document.getElementById('tabSignup').classList.add('active');
+            document.getElementById('tabLogin').classList.remove('active');
+            document.getElementById('signupForm').classList.remove('hidden');
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('msg').classList.add('hidden');
+        }
+
+        function login() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const pass = document.getElementById('loginPass').value;
+            if (!email || !pass) { showMsg('Please enter email and password.', 'error'); return; }
+            const users = getUsers();
+            const user = users.find(u => u.email === email && u.hash === hash(pass));
+            if (!user) { showMsg('Invalid email or password.', 'error'); return; }
+            sessionStorage.setItem('tipcalc_loggedIn', email);
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('calcScreen').classList.remove('hidden');
+        }
+
+        function signup() {
+            const email = document.getElementById('signupEmail').value.trim();
+            const pass = document.getElementById('signupPass').value;
+            const confirm = document.getElementById('signupConfirm').value;
+            if (!email || !pass || !confirm) { showMsg('Please fill all fields.', 'error'); return; }
+            if (pass !== confirm) { showMsg('Passwords do not match.', 'error'); return; }
+            if (pass.length < 4) { showMsg('Password must be at least 4 characters.', 'error'); return; }
+            const users = getUsers();
+            if (users.some(u => u.email === email)) { showMsg('Email already registered.', 'error'); return; }
+            users.push({ email, hash: hash(pass) });
+            saveUsers(users);
+            showMsg('Account created! You can log in now.', 'success');
+            showLogin();
+        }
+
+        function logout() {
+            sessionStorage.removeItem('tipcalc_loggedIn');
+            document.getElementById('calcScreen').classList.add('hidden');
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('loginEmail').value = '';
+            document.getElementById('loginPass').value = '';
+        }
+
         function calculate() {
             const bill = parseFloat(document.getElementById('bill').value) || 0;
             const tipPct = parseFloat(document.getElementById('tip').value) || 0;
@@ -45,6 +146,12 @@
             const total = bill + tipAmount;
             document.getElementById('tipOut').textContent = tipAmount.toFixed(2);
             document.getElementById('totalOut').textContent = total.toFixed(2);
+        }
+
+        // On load: if already logged in, show calculator
+        if (sessionStorage.getItem('tipcalc_loggedIn')) {
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('calcScreen').classList.remove('hidden');
         }
     </script>
 </body>
